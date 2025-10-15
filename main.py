@@ -1,15 +1,15 @@
-# Главный файл приложения
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Query
 from typing import List, Dict, Any
 from datetime import datetime
 
 app = FastAPI(
     title="ToDo лист API",
     description="API для управления задачами с использованием матрицы Эйзенхауэра",
-    version="1.0.0"
+    version="1.0.0",
+    contact={"name": "Ксения"}
 )
 
-# Временное хранилище (позже будет заменено на PostgreSQL)
+# временное хранилище
 tasks_db: List[Dict[str, Any]] = [
     {
         "id": 1,
@@ -52,3 +52,65 @@ tasks_db: List[Dict[str, Any]] = [
         "created_at": datetime.now()
     },
 ]
+
+
+@app.get("/")
+async def welcome() -> dict:
+    return {
+        "title": app.title,
+        "description": app.description,
+        "version": app.version,
+        "contact": app.contact,
+    }
+
+
+# конкретные пути 
+
+@app.get("/tasks/stats")
+async def get_tasks_stats() -> dict:
+    total_tasks = len(tasks_db)
+    by_quadrant = {"Q1": 0, "Q2": 0, "Q3": 0, "Q4": 0}
+    for task in tasks_db:
+        q = task["quadrant"]
+        if q in by_quadrant:
+            by_quadrant[q] += 1
+
+    completed = sum(1 for t in tasks_db if t["completed"])
+    pending = total_tasks - completed
+
+    return {
+        "total_tasks": total_tasks,
+        "by_quadrant": by_quadrant,
+        "by_status": {
+            "completed": completed,
+            "pending": pending
+        }
+    }
+
+
+@app.get("/tasks/search")
+async def search_tasks(q: str = Query(..., min_length=2)) -> dict:
+    keyword = q.lower()
+    results = [
+        task for task in tasks_db
+        if keyword in task["title"].lower()
+        or (task["description"] and keyword in task["description"].lower())
+    ]
+
+    if not results:
+        raise HTTPException(status_code=404, detail=f"Задачи, содержащие '{q}', не найдены")
+
+    return {
+        "query": q,
+        "count": len(results),
+        "tasks": results
+    }
+
+
+# динамический маршрут идет после конкретных
+@app.get("/tasks/{task_id}")
+async def get_task_by_id(task_id: int) -> dict:
+    for task in tasks_db:
+        if task["id"] == task_id:
+            return task
+    raise HTTPException(status_code=404, detail=f"Задача с ID {task_id} не найдена")
