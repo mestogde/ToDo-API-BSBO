@@ -64,7 +64,15 @@ async def welcome() -> dict:
     }
 
 
-# конкретные пути 
+# Конкретные пути ДО динамических
+
+@app.get("/tasks")
+async def get_all_tasks() -> dict:
+    return {
+        "count": len(tasks_db),
+        "tasks": tasks_db
+    }
+
 
 @app.get("/tasks/stats")
 async def get_tasks_stats() -> dict:
@@ -107,7 +115,46 @@ async def search_tasks(q: str = Query(..., min_length=2)) -> dict:
     }
 
 
-# динамический маршрут идет после конкретных
+@app.get("/tasks/status/{status}")
+async def get_tasks_by_status(status: str) -> dict:
+    valid_statuses = ["completed", "pending"]
+    if status not in valid_statuses:
+        raise HTTPException(
+            status_code=404, 
+            detail=f"Статус '{status}' не найден. Допустимые статусы: {valid_statuses}"
+        )
+    
+    # Преобразуем строковый статус в булево значение
+    is_completed = status == "completed"
+    
+    filtered_tasks = [task for task in tasks_db if task["completed"] == is_completed]
+    
+    return {
+        "status": status,
+        "count": len(filtered_tasks),
+        "tasks": filtered_tasks
+    }
+
+
+@app.get("/tasks/quadrant/{quadrant}")
+async def get_tasks_by_quadrant(quadrant: str) -> dict:
+    valid_quadrants = ["Q1", "Q2", "Q3", "Q4"]
+    if quadrant not in valid_quadrants:
+        raise HTTPException(
+            status_code=404, 
+            detail=f"Квадрант '{quadrant}' не найден. Допустимые квадранты: {valid_quadrants}"
+        )
+    
+    filtered_tasks = [task for task in tasks_db if task["quadrant"] == quadrant]
+    
+    return {
+        "quadrant": quadrant,
+        "count": len(filtered_tasks),
+        "tasks": filtered_tasks
+    }
+
+
+# Динамический маршрут с числовым параметром идет ПОСЛЕ всех конкретных путей
 @app.get("/tasks/{task_id}")
 async def get_task_by_id(task_id: int) -> dict:
     for task in tasks_db:
