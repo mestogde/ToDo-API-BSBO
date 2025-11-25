@@ -1,113 +1,83 @@
-from fastapi import FastAPI
-from pydantic import BaseModel
-from typing import Optional
-from datetime import datetime
-from routers import tasks
+from fastapi import FastAPI, Depends
+from contextlib import asynccontextmanager
+from database import init_db, get_async_session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, text
+from routers import tasks, stats
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Lifespan manager для управления жизненным циклом приложения.
+    
+    - Код ДО yield выполняется при ЗАПУСКЕ приложения
+    - Код ПОСЛЕ yield выполняется при ОСТАНОВКЕ приложения
+    """
+    # Код ДО yield выполняется при ЗАПУСКЕ
+    print("🚀 Запуск приложения...")
+    print("🗃️ Инициализация базы данных...")
+    
+    # Создаем таблицы (если их нет)
+    await init_db()
+    print("✅ Приложение готово к работе!")
+    
+    yield  # Здесь приложение работает
+    
+    # Код ПОСЛЕ yield выполняется при ОСТАНОВКЕ
+    print("🛑 Остановка приложения...")
+
 
 app = FastAPI(
     title="ToDo лист API",
     description="API для управления задачами с использованием матрицы Эйзенхауэра",
-    version="1.0.0",
-    contact={"name": "Ксения"}
+    version="2.0.0",
+    contact={
+        "name": "Ваше Имя",
+    },
+    lifespan=lifespan  # Подключаем lifespan
 )
 
-# Модель Pydantic для создания новой задачи
-class TaskCreate(BaseModel):
-    title: str
-    description: Optional[str] = None
-    is_important: bool
-    is_urgent: bool
-    
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "title": "Новая задача",
-                "description": "Описание новой задачи",
-                "is_important": True,
-                "is_urgent": False
-            }
-        }
-
-# Модель Pydantic для ответа (включает все поля)
-class TaskResponse(BaseModel):
-    id: int
-    title: str
-    description: Optional[str]
-    is_important: bool
-    is_urgent: bool
-    quadrant: str
-    completed: bool
-    created_at: datetime
-
-# Включаем роутер задач с префиксом /tasks
-app.include_router(tasks.router, prefix="/tasks", tags=["tasks"])
+# Подключение роутеров к приложению
+app.include_router(tasks.router, prefix="/api/v2")
+app.include_router(stats.router, prefix="/api/v2")
 
 
 @app.get("/")
-async def welcome() -> dict:
+async def read_root() -> dict:
+    """
+    Корневой endpoint API.
+    
+    Returns:
+        dict: Основная информация о API
+    """
     return {
-        "title": app.title,
-        "description": app.description,
-        "version": app.version,
-        "contact": app.contact,
+        "message": "Task Manager API - Управление задачами по матрице Эйзенхауэра",
+        "version": "2.0.0",
+        "database": "PostgreSQL (Supabase)",
+        "docs": "/docs",
+        "redoc": "/redoc",
     }
 
 
-# Простой POST запрос для создания новой задачи
-@app.post("/tasks/create", response_model=TaskResponse, tags=["tasks"])
-async def create_task(task_data: TaskCreate):
+@app.get("/health")
+async def health_check(
+    db: AsyncSession = Depends(get_async_session)
+) -> dict:
     """
-    Создание новой задачи с валидацией данных
+    Проверка здоровья API и динамическая проверка подключения к БД.
     
-    - **title**: Название задачи (обязательное)
-    - **description**: Описание задачи (опциональное)
-    - **is_important**: Важная ли задача
-    - **is_urgent**: Срочная ли задача
+    Returns:
+        dict: Статус здоровья API и подключения к БД
     """
+    try:
+        # Пытаемся выполнить простейший запрос к БД
+        await db.execute(text("SELECT 1"))
+        db_status = "connected"
+    except Exception:
+        db_status = "disconnected"
     
-    # Определяем квадрант на основе важности и срочности
-    if task_data.is_important and task_data.is_urgent:
-        quadrant = "Q1"
-    elif task_data.is_important and not task_data.is_urgent:
-        quadrant = "Q2"
-    elif not task_data.is_important and task_data.is_urgent:
-        quadrant = "Q3"
-    else:
-        quadrant = "Q4"
-    
-    # Создаем новую задачу
-    new_task = {
-        "id": len(tasks.tasks_db) + 1,
-        "title": task_data.title,
-        "description": task_data.description,
-        "is_important": task_data.is_important,
-        "is_urgent": task_data.is_urgent,
-        "quadrant": quadrant,
-        "completed": False,
-        "created_at": datetime.now()
+    return {
+        "status": "healthy",
+        "database": db_status
     }
-    
-    # Добавляем задачу в базу данных
-    tasks.tasks_db.append(new_task)
-    
-    return new_task
-
-
-# Дополнительный POST для отметки задачи как выполненной
-@app.post("/tasks/{task_id}/complete", tags=["tasks"])
-async def complete_task(task_id: int):
-    """
-    Отметить задачу как выполненную
-    
-    - **task_id**: ID задачи для отметки как выполненной
-    """
-    for task in tasks.tasks_db:
-        if task["id"] == task_id:
-            task["completed"] = True
-            return {
-                "message": f"Задача '{task['title']}' отмечена как выполненная",
-                "task_id": task_id,
-                "completed": True
-            }
-    
-    raise HTTPException(status_code=404, detail=f"Задача с ID {task_id} не найдена")
