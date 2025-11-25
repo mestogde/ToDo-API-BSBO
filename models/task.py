@@ -4,11 +4,6 @@ from database import Base
 
 
 class Task(Base):
-    """
-    Модель задачи для базы данных.
-    
-    Представляет задачу в системе с использованием матрицы Эйзенхауэра.
-    """
     __tablename__ = "tasks"
     
     id = Column(
@@ -63,16 +58,9 @@ class Task(Base):
     )
     
     def __repr__(self) -> str:
-        """Строковое представление объекта для отладки."""
         return f"<Task(id={self.id}, title='{self.title}', quadrant='{self.quadrant}')>"
     
     def to_dict(self) -> dict:
-        """
-        Преобразует объект задачи в словарь.
-        
-        Returns:
-            dict: Словарь с данными задачи
-        """
         return {
             "id": self.id,
             "title": self.title,
