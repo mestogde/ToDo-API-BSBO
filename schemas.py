@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field, validator
 from typing import Optional
 from datetime import datetime
 
+
 class TaskBase(BaseModel):
     title: str = Field(
         ...,
@@ -21,14 +22,16 @@ class TaskBase(BaseModel):
         description="Важность задачи",
         examples=[True]
     )
-    is_urgent: bool = Field(
-        ...,
-        description="Срочность задачи",
-        examples=[False]
+    deadline_at: Optional[datetime] = Field(
+        None,
+        description="Плановый срок выполнения задачи",
+        examples=["2024-12-31T23:59:59Z"]
     )
+
 
 class TaskCreate(TaskBase):
     pass
+
 
 class TaskUpdate(BaseModel):
     title: Optional[str] = Field(
@@ -46,38 +49,24 @@ class TaskUpdate(BaseModel):
         None,
         description="Новая важность"
     )
-    is_urgent: Optional[bool] = Field(
+    deadline_at: Optional[datetime] = Field(
         None,
-        description="Новая срочность"
+        description="Новый срок выполнения"
     )
     completed: Optional[bool] = Field(
         None,
         description="Статус выполнения"
     )
 
+
 class TaskResponse(TaskBase):
-    id: int = Field(
-        ...,
-        description="Уникальный идентификатор задачи",
-        examples=[1]
-    )
-    quadrant: str = Field(
-        ...,
-        description="Квадрант матрицы Эйзенхауэра",
-        examples=["Q1"]
-    )
-    completed: bool = Field(
-        default=False,
-        description="Статус выполнения задачи"
-    )
-    created_at: datetime = Field(
-        ...,
-        description="Дата и время создания задачи"
-    )
-    completed_at: Optional[datetime] = Field(
-        None,
-        description="Дата и время завершения задачи"
-    )
+    id: int = Field(..., description="Уникальный идентификатор задачи", examples=[1])
+    quadrant: str = Field(..., description="Квадрант матрицы Эйзенхауэра", examples=["Q1"])
+    is_urgent: bool = Field(..., description="Расчетная срочность задачи", examples=[True])
+    days_until_deadline: Optional[int] = Field(None, description="Дней до дедлайна", examples=[5])
+    completed: bool = Field(default=False, description="Статус выполнения задачи")
+    created_at: datetime = Field(..., description="Дата и время создания задачи")
+    completed_at: Optional[datetime] = Field(None, description="Дата и время завершения задачи")
     
     @validator('quadrant')
     def validate_quadrant(cls, v):
