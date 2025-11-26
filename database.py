@@ -1,25 +1,24 @@
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.orm import DeclarativeBase  # базовый класс для моделей SQLAlchemy 2.0 (новый стиль)
+from sqlalchemy.orm import DeclarativeBase
 from typing import AsyncGenerator
 import os
+import uuid
 from dotenv import load_dotenv
 
-try:
-    from models.task import Task
-    from models import Base
-except ImportError:
-    class Base(DeclarativeBase):
-        pass
-
-# Загрузка переменных окружения
 load_dotenv()
+
+class Base(DeclarativeBase):
+    pass
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-# Создание асинхронного движка базы данных
+# Создание асинхронного движка базы данных с отключением кэширования prepared statements
 engine = create_async_engine(
     DATABASE_URL,
-    connect_args={"statement_cache_size": 0}
+    connect_args={
+        "statement_cache_size": 0,  # Отключаем кэш prepared statements
+        "prepared_statement_name_func": lambda: f"stmt_{uuid.uuid4().hex}"  # Уникальные имена для statements
+    }
 )
 
 # Создание фабрики асинхронных сессий
@@ -36,18 +35,7 @@ async def init_db():
     """
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    
-    print("База данных инициализирована!")
-
-
-async def drop_db():
-    """
-    Удаление всех таблиц из базы данных.
-    """
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-    
-    print("Все таблицы удалены!")
+    print("✅ База данных инициализирована!")
 
 
 async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
