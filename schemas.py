@@ -1,3 +1,4 @@
+# schemas.py
 from pydantic import BaseModel, Field, validator
 from typing import Optional
 from datetime import datetime
@@ -59,8 +60,10 @@ class TaskUpdate(BaseModel):
     )
 
 
+# schemas.py (добавьте в класс TaskResponse)
 class TaskResponse(TaskBase):
     id: int = Field(..., description="Уникальный идентификатор задачи", examples=[1])
+    user_id: int = Field(..., description="ID владельца задачи", examples=[1])  # ← ДОБАВЬТЕ ЭТО
     quadrant: str = Field(..., description="Квадрант матрицы Эйзенхауэра", examples=["Q1"])
     is_urgent: bool = Field(..., description="Расчетная срочность задачи", examples=[True])
     days_until_deadline: Optional[int] = Field(None, description="Дней до дедлайна", examples=[5])

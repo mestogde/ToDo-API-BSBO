@@ -1,51 +1,94 @@
+# routers/stats.py
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from datetime import date, datetime, time
-from models import Task
+from models import Task, User
 from database import get_async_session
+from dependencies import get_current_user
 
 router = APIRouter(prefix="/stats", tags=["statistics"])
 
 
 @router.get("/")
-async def get_tasks_stats(db: AsyncSession = Depends(get_async_session)):
+async def get_tasks_stats(
+    db: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(get_current_user)
+):
     """
     Получение статистики по задачам
-    
-    Возвращает:
-    - Общее количество задач
-    - Количество задач по квадрантам
-    - Количество выполненных и невыполненных задач
     """
-    result = await db.execute(select(Task))
-    tasks = result.scalars().all()
+    # Исправлено: убрали .value, так как role теперь строка
+    if current_user.role == "admin":
+        # Администратор видит статистику по всем задачам
+        total_result = await db.execute(select(func.count(Task.id)))
+        total_tasks = total_result.scalar()
+        
+        quadrant_result = await db.execute(
+            select(Task.quadrant, func.count(Task.id))
+            .group_by(Task.quadrant)
+        )
+        by_quadrant = dict(quadrant_result.all())
+        
+        status_result = await db.execute(
+            select(Task.completed, func.count(Task.id))
+            .group_by(Task.completed)
+        )
+        status_data = dict(status_result.all())
+    else:
+        # Обычный пользователь видит статистику только по своим задачам
+        total_result = await db.execute(
+            select(func.count(Task.id)).where(Task.user_id == current_user.id)
+        )
+        total_tasks = total_result.scalar()
+        
+        quadrant_result = await db.execute(
+            select(Task.quadrant, func.count(Task.id))
+            .where(Task.user_id == current_user.id)
+            .group_by(Task.quadrant)
+        )
+        by_quadrant = dict(quadrant_result.all())
+        
+        status_result = await db.execute(
+            select(Task.completed, func.count(Task.id))
+            .where(Task.user_id == current_user.id)
+            .group_by(Task.completed)
+        )
+        status_data = dict(status_result.all())
     
-    total_tasks = len(tasks)
-    by_quadrant = {"Q1": 0, "Q2": 0, "Q3": 0, "Q4": 0}
-    by_status = {"completed": 0, "pending": 0}
+    # Форматируем результат
+    by_status = {"completed": status_data.get(True, 0), "pending": status_data.get(False, 0)}
     
-    for task in tasks:
-        if task.quadrant in by_quadrant:
-            by_quadrant[task.quadrant] += 1
-        if task.completed:
-            by_status["completed"] += 1
-        else:
-            by_status["pending"] += 1
+    # Заполняем все квадранты нулями если их нет
+    all_quadrants = {"Q1": 0, "Q2": 0, "Q3": 0, "Q4": 0}
+    all_quadrants.update(by_quadrant)
     
     return {
         "total_tasks": total_tasks,
-        "by_quadrant": by_quadrant,
+        "by_quadrant": all_quadrants,
         "by_status": by_status
     }
 
 
 @router.get("/deadlines")
-async def get_deadlines_stats(db: AsyncSession = Depends(get_async_session)):
+async def get_deadlines_stats(
+    db: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(get_current_user)
+):
     """Статистика по дедлайнам для невыполненных задач"""
-    result = await db.execute(
-        select(Task).where(Task.completed == False)
-    )
+    # Исправлено: убрали .value
+    if current_user.role == "admin":
+        result = await db.execute(
+            select(Task).where(Task.completed == False)
+        )
+    else:
+        result = await db.execute(
+            select(Task).where(
+                Task.completed == False,
+                Task.user_id == current_user.id
+            )
+        )
+    
     tasks = result.scalars().all()
     
     today = date.today()
@@ -57,7 +100,6 @@ async def get_deadlines_stats(db: AsyncSession = Depends(get_async_session)):
             deadline_date = task.deadline_at.date()
             days_until_deadline = (deadline_date - today).days
             
-            # Определяем статус дедлайна
             if days_until_deadline < 0:
                 status = "overdue"
                 overdue_tasks += 1
@@ -75,10 +117,10 @@ async def get_deadlines_stats(db: AsyncSession = Depends(get_async_session)):
                 "days_until_deadline": days_until_deadline,
                 "status": status,
                 "is_urgent": days_until_deadline <= 3,
-                "quadrant": task.quadrant
+                "quadrant": task.quadrant,
+                "user_id": task.user_id
             })
     
-    # Сортируем: просроченные → срочные → обычные
     deadline_stats.sort(key=lambda x: x["days_until_deadline"])
     
     urgent_tasks = len([t for t in deadline_stats if t["is_urgent"] and t["status"] != "overdue"])
@@ -93,51 +135,49 @@ async def get_deadlines_stats(db: AsyncSession = Depends(get_async_session)):
 
 
 @router.get("/today")
-async def get_today_stats(db: AsyncSession = Depends(get_async_session)):
+async def get_today_stats(
+    db: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(get_current_user)
+):
     """
     Статистика по задачам на сегодня
-    
-    Возвращает:
-    - Общее количество задач на сегодня
-    - Распределение по квадрантам
-    - Статус выполнения
     """
-    # Получаем сегодняшнюю дату
     today = date.today()
     today_start = datetime.combine(today, time.min)
     today_end = datetime.combine(today, time.max)
     
-    # Ищем задачи с дедлайном на сегодня
-    result = await db.execute(
-        select(Task).where(
-            Task.deadline_at.between(today_start, today_end)
+    # Исправлено: убрали .value
+    if current_user.role == "admin":
+        result = await db.execute(
+            select(Task).where(
+                Task.deadline_at.between(today_start, today_end)
+            )
         )
-    )
+    else:
+        result = await db.execute(
+            select(Task).where(
+                Task.deadline_at.between(today_start, today_end),
+                Task.user_id == current_user.id
+            )
+        )
+    
     tasks = result.scalars().all()
     
     total_tasks_today = len(tasks)
     
-    # Статистика по квадрантам
     by_quadrant = {"Q1": 0, "Q2": 0, "Q3": 0, "Q4": 0}
-    
-    # Статистика по статусу выполнения
     by_status = {"completed": 0, "pending": 0}
-    
-    # Список задач для детального отчета
     today_tasks = []
     
     for task in tasks:
-        # Подсчет по квадрантам
         if task.quadrant in by_quadrant:
             by_quadrant[task.quadrant] += 1
         
-        # Подсчет по статусам
         if task.completed:
             by_status["completed"] += 1
         else:
             by_status["pending"] += 1
         
-        # Добавляем задачу в детальный отчет
         today_tasks.append({
             "id": task.id,
             "title": task.title,
@@ -146,14 +186,17 @@ async def get_today_stats(db: AsyncSession = Depends(get_async_session)):
             "quadrant": task.quadrant,
             "completed": task.completed,
             "deadline_at": task.deadline_at,
-            "created_at": task.created_at
+            "created_at": task.created_at,
+            "user_id": task.user_id
         })
+    
+    completion_rate = round((by_status["completed"] / total_tasks_today * 100) if total_tasks_today > 0 else 0, 1)
     
     return {
         "date": today.isoformat(),
         "total_tasks_due_today": total_tasks_today,
         "by_quadrant": by_quadrant,
         "by_status": by_status,
-        "completion_rate": round((by_status["completed"] / total_tasks_today * 100) if total_tasks_today > 0 else 0, 1),
+        "completion_rate": completion_rate,
         "tasks": today_tasks
     }

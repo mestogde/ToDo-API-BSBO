@@ -1,3 +1,6 @@
+# models/__init__.py
+from database import Base
 from models.task import Task
+from models.user import User, UserRole
 
-__all__ = ["Task"]
+__all__ = ["Base", "Task", "User", "UserRole"]
