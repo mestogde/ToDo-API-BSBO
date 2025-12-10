@@ -8,11 +8,17 @@ from models import User, UserRole
 from schemas_auth import UserCreate, UserResponse, Token
 from auth_utils import verify_password, get_password_hash, create_access_token
 from dependencies import get_current_user
+from pydantic import BaseModel, Field
 
 router = APIRouter(
     prefix="/auth",
     tags=["authentication"]
 )
+
+
+class ChangePasswordRequest(BaseModel):
+    old_password: str = Field(..., description="Старый пароль")
+    new_password: str = Field(..., min_length=6, description="Новый пароль (минимум 6 символов)")
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
@@ -25,7 +31,9 @@ async def register(
     result = await db.execute(
         select(User).where(User.email == user_data.email)
     )
-    if result.scalar_one_or_none():
+    existing_user = result.scalar_one_or_none()
+    
+    if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Пользователь с таким email уже существует"
@@ -35,7 +43,9 @@ async def register(
     result = await db.execute(
         select(User).where(User.nickname == user_data.nickname)
     )
-    if result.scalar_one_or_none():
+    existing_user = result.scalar_one_or_none()
+    
+    if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Пользователь с таким никнеймом уже существует"
@@ -46,7 +56,7 @@ async def register(
         nickname=user_data.nickname,
         email=user_data.email,
         hashed_password=get_password_hash(user_data.password),
-        role=UserRole.USER.value  # Используем .value для строки
+        role=UserRole.USER.value  # По умолчанию обычный пользователь
     )
     
     db.add(new_user)
@@ -77,9 +87,8 @@ async def login(
         )
     
     # Создаем JWT токен
-    # user.role теперь строка, а не enum - убираем .value
     access_token = create_access_token(
-        data={"sub": str(user.id), "role": user.role}  # ← убрали .value
+        data={"sub": str(user.id), "role": user.role}
     )
     
     return {"access_token": access_token, "token_type": "bearer"}
@@ -91,3 +100,38 @@ async def get_me(
 ):
     """Получение информации о текущем пользователе"""
     return current_user
+
+
+@router.patch("/change-password")
+async def change_password(
+    password_data: ChangePasswordRequest,
+    db: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Смена пароля пользователя
+    
+    - **old_password**: текущий пароль пользователя
+    - **new_password**: новый пароль (минимум 6 символов)
+    """
+    # Проверяем старый пароль
+    if not verify_password(password_data.old_password, current_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Неверный старый пароль"
+        )
+    
+    # Проверяем, что новый пароль не совпадает со старым
+    if password_data.old_password == password_data.new_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Новый пароль не должен совпадать со старым"
+        )
+    
+    # Обновляем пароль
+    current_user.hashed_password = get_password_hash(password_data.new_password)
+    
+    await db.commit()
+    await db.refresh(current_user)
+    
+    return {"message": "Пароль успешно изменен"}

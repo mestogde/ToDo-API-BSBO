@@ -18,7 +18,6 @@ async def get_tasks_stats(
     """
     Получение статистики по задачам
     """
-    # Исправлено: убрали .value, так как role теперь строка
     if current_user.role == "admin":
         # Администратор видит статистику по всем задачам
         total_result = await db.execute(select(func.count(Task.id)))
@@ -76,7 +75,6 @@ async def get_deadlines_stats(
     current_user: User = Depends(get_current_user)
 ):
     """Статистика по дедлайнам для невыполненных задач"""
-    # Исправлено: убрали .value
     if current_user.role == "admin":
         result = await db.execute(
             select(Task).where(Task.completed == False)
@@ -146,7 +144,6 @@ async def get_today_stats(
     today_start = datetime.combine(today, time.min)
     today_end = datetime.combine(today, time.max)
     
-    # Исправлено: убрали .value
     if current_user.role == "admin":
         result = await db.execute(
             select(Task).where(
