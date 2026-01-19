@@ -51,7 +51,7 @@ def calculate_days_until_deadline(deadline_at: Optional[datetime]) -> Optional[i
     return (deadline_date - today).days
 
 
-@router.get("", response_model=List[TaskResponse])
+@router.get("/", response_model=List[TaskResponse])
 async def get_all_tasks(
     db: AsyncSession = Depends(get_async_session),
     current_user: User = Depends(get_current_user)
@@ -61,6 +61,8 @@ async def get_all_tasks(
     
     Администратор видит все задачи, обычный пользователь - только свои
     """
+    print(f"DEBUG: get_all_tasks вызван, пользователь: {current_user}")
+    
     # Исправлено: убрали .value
     if current_user.role == "admin":
         result = await db.execute(select(Task))
@@ -276,7 +278,7 @@ async def get_tasks_due_today(
     return response_tasks
 
 
-@router.get("/{task_id}", response_model=TaskResponse)
+@router.get("/task/{task_id}", response_model=TaskResponse)
 async def get_task_by_id(
     task_id: int,
     db: AsyncSession = Depends(get_async_session),
@@ -345,7 +347,7 @@ async def create_task(
     return TaskResponse(**task_dict)
 
 
-@router.put("/{task_id}", response_model=TaskResponse)
+@router.put("/task/{task_id}", response_model=TaskResponse)
 async def update_task(
     task_id: int,
     task_update: TaskUpdate,
@@ -394,7 +396,7 @@ async def update_task(
     return TaskResponse(**task_dict)
 
 
-@router.patch("/{task_id}/complete", response_model=TaskResponse)
+@router.patch("/task/{task_id}/complete", response_model=TaskResponse)
 async def complete_task(
     task_id: int,
     db: AsyncSession = Depends(get_async_session),
@@ -437,7 +439,7 @@ async def complete_task(
     return TaskResponse(**task_dict)
 
 
-@router.delete("/{task_id}")
+@router.delete("/task/{task_id}")
 async def delete_task(
     task_id: int,
     db: AsyncSession = Depends(get_async_session),

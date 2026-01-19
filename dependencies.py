@@ -24,8 +24,11 @@ async def get_current_user(
     )
     
     # Декодирование токена
+    print(f"DEBUG: Получен токен: {token[:20]}...")
     payload = decode_access_token(token)
+    print(f"DEBUG: Декодированный payload: {payload}")
     if payload is None:
+        print("DEBUG: Токен невалидный, вызываем исключение")
         raise credentials_exception
     
     user_id: Optional[int] = payload.get("sub")

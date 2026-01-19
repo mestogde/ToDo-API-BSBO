@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Панель управления - ToDo Matrix</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
+    <!-- Путь правильный -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- Навигация -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="dashboard.html">
+                <i class="bi bi-check2-square me-2"></i>ToDo Matrix
+            </a>
+            
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="#" data-page="tasks">
+                            <i class="bi bi-list-task me-1"></i>Задачи
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-page="stats">
+                            <i class="bi bi-bar-chart me-1"></i>Статистика
+                        </a>
+                    </li>
+                    <li class="nav-item" id="adminMenuItem" style="display: none;">
+                        <a class="nav-link" href="#" data-page="admin">
+                            <i class="bi bi-shield-lock me-1"></i>Админ-панель
+                        </a>
+                    </li>
+                </ul>
+                
+                <div class="navbar-text me-3">
+                    <span id="userGreeting"></span>
+                </div>
+                
+                <div class="dropdown">
+                    <button class="btn btn-outline-light btn-sm dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown">
+                        <i class="bi bi-person-circle"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#changePasswordModal">
+                            <i class="bi bi-key me-2"></i>Сменить пароль
+                        </a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item text-danger" href="#" id="logoutBtn">
+                            <i class="bi bi-box-arrow-right me-2"></i>Выйти
+                        </a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </nav>
+    
+    <!-- Контейнер для уведомлений -->
+    <div id="alertContainer" class="container mt-3"></div>
+    
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Сайдбар -->
+            <div class="col-lg-2 col-md-3 sidebar">
+                <div class="mt-3">
+                    <div class="d-grid mb-3">
+                        <button class="btn btn-primary" id="createTaskBtn">
+                            <i class="bi bi-plus-circle me-1"></i>Новая задача
+                        </button>
+                    </div>
+                    
+                    <h6 class="sidebar-heading px-3 mt-4 mb-1 text-muted">Фильтры</h6>
+                    <ul class="nav flex-column mb-2">
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" data-filter="all">
+                                <i class="bi bi-list-ul me-2"></i>Все задачи
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" data-filter="pending">
+                                <i class="bi bi-clock me-2"></i>В работе
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" data-filter="completed">
+                                <i class="bi bi-check2-circle me-2"></i>Выполненные
+                            </a>
+                        </li>
+                    </ul>
+                    
+                    <h6 class="sidebar-heading px-3 mt-4 mb-1 text-muted">Квадранты</h6>
+                    <ul class="nav flex-column mb-2">
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" data-quadrant="Q1">
+                                <span class="badge bg-danger me-2">Q1</span>Важные и срочные
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" data-quadrant="Q2">
+                                <span class="badge bg-success me-2">Q2</span>Важные, не срочные
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" data-quadrant="Q3">
+                                <span class="badge bg-warning me-2">Q3</span>Срочные, не важные
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" data-quadrant="Q4">
+                                <span class="badge bg-secondary me-2">Q4</span>Не важные, не срочные
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- Основной контент -->
+            <div class="col-lg-10 col-md-9">
+                <main id="mainContent" class="p-4">
+                    <!-- Контент будет загружаться динамически -->
+                    <div class="text-center mt-5">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Загрузка...</span>
+                        </div>
+                        <p class="mt-2">Загрузка данных...</p>
+                    </div>
+                </main>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Модальное окно создания/редактирования задачи -->
+    <div class="modal fade" id="taskModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalTitle">Новая задача</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="taskForm">
+                        <div class="mb-3">
+                            <label for="taskTitle" class="form-label">Название *</label>
+                            <input type="text" class="form-control" id="taskTitle" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="taskDescription" class="form-label">Описание</label>
+                            <textarea class="form-control" id="taskDescription" rows="3"></textarea>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Важность</label>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="taskImportant">
+                                    <label class="form-check-label" for="taskImportant">
+                                        Важная задача
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="taskDeadline" class="form-label">Срок выполнения</label>
+                                <input type="datetime-local" class="form-control" id="taskDeadline">
+                            </div>
+                        </div>
+                        <input type="hidden" id="taskId">
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-primary" id="saveTaskBtn">Сохранить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Модальное окно смены пароля -->
+    <div class="modal fade" id="changePasswordModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Смена пароля</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="changePasswordForm">
+                        <div class="mb-3">
+                            <label for="oldPassword" class="form-label">Старый пароль *</label>
+                            <input type="password" class="form-control" id="oldPassword" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="newPassword" class="form-label">Новый пароль *</label>
+                            <input type="password" class="form-control" id="newPassword" required minlength="6">
+                        </div>
+                        <div class="mb-3">
+                            <label for="confirmPassword" class="form-label">Подтвердите новый пароль *</label>
+                            <input type="password" class="form-control" id="confirmPassword" required>
+                        </div>
+                    </form>
+                    <div id="passwordMessage" class="alert d-none mt-3"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-primary" id="savePasswordBtn">Изменить пароль</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Подключаем библиотеки -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <!-- Пути правильные -->
+    <script src="js/config.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

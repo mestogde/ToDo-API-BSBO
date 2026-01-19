@@ -1,5 +1,5 @@
 # schemas.py
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 from datetime import datetime
 
@@ -71,7 +71,8 @@ class TaskResponse(TaskBase):
     created_at: datetime = Field(..., description="Дата и время создания задачи")
     completed_at: Optional[datetime] = Field(None, description="Дата и время завершения задачи")
     
-    @validator('quadrant')
+    @field_validator('quadrant')
+    @classmethod
     def validate_quadrant(cls, v):
         if v not in ['Q1', 'Q2', 'Q3', 'Q4']:
             raise ValueError('Квадрант должен быть Q1, Q2, Q3 или Q4')

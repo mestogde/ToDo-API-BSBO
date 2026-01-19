@@ -7,7 +7,7 @@ from models import Task, User
 from database import get_async_session
 from dependencies import get_current_user
 
-router = APIRouter(prefix="/stats", tags=["statistics"])
+router = APIRouter(tags=["statistics"])
 
 
 @router.get("/")
@@ -18,6 +18,8 @@ async def get_tasks_stats(
     """
     Получение статистики по задачам
     """
+    print(f"DEBUG: stats.py - get_tasks_stats вызван, пользователь: {current_user}")
+    
     if current_user.role == "admin":
         # Администратор видит статистику по всем задачам
         total_result = await db.execute(select(func.count(Task.id)))
@@ -75,6 +77,8 @@ async def get_deadlines_stats(
     current_user: User = Depends(get_current_user)
 ):
     """Статистика по дедлайнам для невыполненных задач"""
+    print(f"DEBUG: stats.py - get_deadlines_stats вызван, пользователь: {current_user}")
+    
     if current_user.role == "admin":
         result = await db.execute(
             select(Task).where(Task.completed == False)
@@ -140,6 +144,8 @@ async def get_today_stats(
     """
     Статистика по задачам на сегодня
     """
+    print(f"DEBUG: stats.py - get_today_stats вызван, пользователь: {current_user}")
+    
     today = date.today()
     today_start = datetime.combine(today, time.min)
     today_end = datetime.combine(today, time.max)

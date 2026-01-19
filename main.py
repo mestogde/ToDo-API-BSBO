@@ -1,5 +1,7 @@
 # main.py
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, Depends
+from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from database import init_db, get_async_session
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,12 +25,22 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Подключение роутеров - ВЕРСИЯ 3.0
-app.include_router(auth.router, prefix="/api/v3")
-app.include_router(tasks.router, prefix="/api/v3")
-app.include_router(stats.router, prefix="/api/v3")
-app.include_router(admin.router, prefix="/api/v3")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["Content-Type", "Authorization"],
+)
 
+# Подключение роутеров - ВЕРСИЯ 3.0
+app.include_router(auth.router, prefix="/api/v3", tags=["auth"])
+app.include_router(tasks.router, prefix="/api/v3", tags=["tasks"])
+app.include_router(stats.router, prefix="/api/v3", tags=["stats"])
+app.include_router(admin.router, prefix="/api/v3", tags=["admin"])
+
+# Подключение статических файлов для фронтенда
+app.mount("/frontend", StaticFiles(directory="frontend", html=True), name="frontend")
 
 @app.get("/")
 async def read_root() -> dict:
